@@ -1,0 +1,42 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: ["master"]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-24.04 [Beta]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Cài đặt Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.19.5"
+          cache: "npm"
+
+      # 2. Cài dependency và Build
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build
+        env:
+          CI: false # Ngăn build thất bại nếu có warning nhỏ
+
+      # 3. Copy thư mục build lên Server
+      - name: Copy Build folder to Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "build/*" # Chỉ lấy nội dung trong thư mục build
+          target: "/var/www/html/"
+          strip_components: 1 # Loại bỏ thư mục 'build' để file nằm ngay root
+
+
+    # 4. (Tùy chọn) Reload Nginx nếu cần, thường file tĩnh không cần reload nginx
+    # Nhưng nếu bạn thay đổi config nginx thì mới cần.
