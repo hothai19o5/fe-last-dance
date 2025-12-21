@@ -71,7 +71,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                         >
                             <Avatar className="h-10 w-10">
                                 <AvatarFallback className="bg-primary text-primary-foreground">
-                                    {user?.name?.charAt(0) || "A"}
+                                    {user?.username?.charAt(0).toUpperCase() || "A"}
                                 </AvatarFallback>
                             </Avatar>
                         </Button>
@@ -79,9 +79,9 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     <DropdownMenuContent className="w-56" align="end">
                         <DropdownMenuLabel className="font-normal">
                             <div className="flex flex-col space-y-1">
-                                <p className="text-sm font-medium">{user?.name || "Admin"}</p>
+                                <p className="text-sm font-medium">{user?.username || "Admin"}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {user?.email || "admin@example.com"}
+                                    Administrator
                                 </p>
                             </div>
                         </DropdownMenuLabel>

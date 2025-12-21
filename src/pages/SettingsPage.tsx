@@ -38,15 +38,9 @@ export function SettingsPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Name</Label>
+                            <Label>Username</Label>
                             <p className="rounded-xl bg-muted px-4 py-2.5 text-sm">
-                                {user?.name || "Admin User"}
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Email</Label>
-                            <p className="rounded-xl bg-muted px-4 py-2.5 text-sm">
-                                {user?.email || "admin@example.com"}
+                                {user?.username || "Admin"}
                             </p>
                         </div>
                         <div className="space-y-2">

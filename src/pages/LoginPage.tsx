@@ -6,7 +6,7 @@ import { useAuth } from "@/context";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@/components/ui";
 
 export function LoginPage() {
-    const [email, setEmail] = useState("");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -24,11 +24,11 @@ export function LoginPage() {
         setIsLoading(true);
 
         try {
-            const success = await login(email, password);
+            const success = await login(username, password);
             if (success) {
                 navigate("/");
             } else {
-                setError("Invalid email or password");
+                setError("Invalid username or password");
             }
         } catch {
             setError("An error occurred. Please try again.");
@@ -66,13 +66,13 @@ export function LoginPage() {
                             )}
 
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
+                                <Label htmlFor="username">Username</Label>
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="admin@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    id="username"
+                                    type="text"
+                                    placeholder="admin"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
                                     required
                                 />
                             </div>

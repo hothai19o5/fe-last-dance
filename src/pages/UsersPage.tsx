@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import {
     Card,
     CardContent,
@@ -20,9 +20,9 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    Button,
 } from "@/components/ui";
 import { userService } from "@/services";
-import { formatDateTime } from "@/lib/utils";
 import type { User } from "@/types";
 
 export function UsersPage() {
@@ -31,14 +31,18 @@ export function UsersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const data = await userService.getUsers();
-                setUsers(data);
-                setFilteredUsers(data);
+                setLoading(true);
+                const response = await userService.getUsers({ page, size: 10 });
+                setUsers(response.content);
+                setFilteredUsers(response.content);
+                setTotalPages(response.totalPages);
             } catch (error) {
                 console.error("Error fetching users:", error);
             } finally {
@@ -47,19 +51,21 @@ export function UsersPage() {
         };
 
         fetchUsers();
-    }, []);
+    }, [page]);
 
     useEffect(() => {
         let result = users;
 
         if (searchQuery) {
             result = result.filter((user) =>
-                user.name.toLowerCase().includes(searchQuery.toLowerCase())
+                user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                user.username.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
         if (statusFilter !== "all") {
-            result = result.filter((user) => user.status === statusFilter);
+            const isEnabled = statusFilter === "enabled";
+            result = result.filter((user) => user.enabled === isEnabled);
         }
 
         setFilteredUsers(result);
@@ -107,8 +113,8 @@ export function UsersPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Status</SelectItem>
-                                    <SelectItem value="Online">Online</SelectItem>
-                                    <SelectItem value="Offline">Offline</SelectItem>
+                                    <SelectItem value="enabled">Enabled</SelectItem>
+                                    <SelectItem value="disabled">Disabled</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -119,14 +125,14 @@ export function UsersPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>User ID</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead className="hidden md:table-cell">Age</TableHead>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Username</TableHead>
+                                    <TableHead>Full Name</TableHead>
+                                    <TableHead className="hidden md:table-cell">Email</TableHead>
                                     <TableHead className="hidden md:table-cell">Gender</TableHead>
-                                    <TableHead className="hidden lg:table-cell">Height</TableHead>
-                                    <TableHead className="hidden lg:table-cell">Weight</TableHead>
-                                    <TableHead className="hidden sm:table-cell">Device ID</TableHead>
-                                    <TableHead className="hidden xl:table-cell">Last Active</TableHead>
+                                    <TableHead className="hidden lg:table-cell">Height (m)</TableHead>
+                                    <TableHead className="hidden lg:table-cell">Weight (kg)</TableHead>
+                                    <TableHead className="hidden xl:table-cell">BMI</TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -140,30 +146,28 @@ export function UsersPage() {
                                         <TableCell className="font-mono text-sm">
                                             {user.id}
                                         </TableCell>
-                                        <TableCell className="font-medium">{user.name}</TableCell>
+                                        <TableCell className="font-medium">{user.username}</TableCell>
+                                        <TableCell>{user.fullName}</TableCell>
                                         <TableCell className="hidden md:table-cell">
-                                            {user.age}
+                                            {user.email}
                                         </TableCell>
                                         <TableCell className="hidden md:table-cell">
-                                            {user.gender}
+                                            {user.gender || "-"}
                                         </TableCell>
                                         <TableCell className="hidden lg:table-cell">
-                                            {user.height} cm
+                                            {user.heightM ?? "-"}
                                         </TableCell>
                                         <TableCell className="hidden lg:table-cell">
-                                            {user.weight} kg
-                                        </TableCell>
-                                        <TableCell className="hidden font-mono text-sm sm:table-cell">
-                                            {user.deviceId}
+                                            {user.weightKg ?? "-"}
                                         </TableCell>
                                         <TableCell className="hidden xl:table-cell">
-                                            {formatDateTime(user.lastActiveTime)}
+                                            {user.bmi?.toFixed(1) ?? "-"}
                                         </TableCell>
                                         <TableCell>
                                             <Badge
-                                                variant={user.status === "Online" ? "default" : "secondary"}
+                                                variant={user.enabled ? "default" : "secondary"}
                                             >
-                                                {user.status}
+                                                {user.enabled ? "Enabled" : "Disabled"}
                                             </Badge>
                                         </TableCell>
                                     </TableRow>
@@ -175,6 +179,30 @@ export function UsersPage() {
                     {filteredUsers.length === 0 && (
                         <div className="py-12 text-center text-muted-foreground">
                             No users found matching your criteria.
+                        </div>
+                    )}
+
+                    {totalPages > 1 && (
+                        <div className="mt-4 flex items-center justify-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(p => Math.max(0, p - 1))}
+                                disabled={page === 0}
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
+                                Page {page + 1} of {totalPages}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                                disabled={page >= totalPages - 1}
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
                         </div>
                     )}
                 </CardContent>

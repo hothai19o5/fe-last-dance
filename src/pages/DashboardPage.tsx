@@ -50,30 +50,39 @@ export function DashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
+
         const fetchData = async () => {
             try {
-                const [statsData, sysHealth, database, devices, api, serviceList] = await Promise.all([
-                    healthService.getDashboardStats(),
-                    healthService.getSystemHealth(),
-                    healthService.getDatabaseStatus(),
-                    healthService.getDeviceStats(),
-                    healthService.getApiStats(),
-                    healthService.getServiceStatuses(),
-                ]);
-                setStats(statsData);
-                setSystemHealth(sysHealth);
-                setDbStatus(database);
-                setDeviceStats(devices);
-                setApiStats(api);
-                setServices(serviceList);
+                // Fetch all dashboard data with a single API call
+                const data = await healthService.getAllDashboardData();
+
+                // Only update state if component is still mounted
+                if (isMounted) {
+                    setStats(data.stats);
+                    setSystemHealth(data.systemHealth);
+                    setDbStatus(data.databaseStatus);
+                    setDeviceStats(data.deviceStats);
+                    setApiStats(data.apiStats);
+                    setServices(data.services);
+                }
             } catch (error) {
-                console.error("Error fetching dashboard data:", error);
+                if (isMounted) {
+                    console.error("Error fetching dashboard data:", error);
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchData();
+
+        // Cleanup function to prevent state updates on unmounted component
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const statCards = [

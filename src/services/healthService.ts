@@ -1,100 +1,154 @@
-import type { DashboardStats, SystemHealth, DatabaseStatus, DeviceStats, ApiStats, ServiceStatus } from "@/types";
+import { apiClient } from "@/api";
+import type { DashboardResponse, DashboardStats, SystemHealth, DatabaseStatus, DeviceStats, ApiStats, ServiceStatus } from "@/types";
 
 export const healthService = {
-    getDashboardStats: async (): Promise<DashboardStats> => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+    getDashboard: async (): Promise<DashboardResponse> => {
+        return apiClient.get<DashboardResponse>('/dashboard');
+    },
+
+    // Fetch all dashboard data in one API call
+    getAllDashboardData: async () => {
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+
+        const stats: DashboardStats = {
+            totalUsers: dashboard.usersStats.totalUsers,
+            activeUsersToday: dashboard.usersStats.activeUsers,
+            alertsLast24h: 0,
+            devicesOnline: dashboard.devicesStats.activeDevices,
+        };
+
+        const systemHealth: SystemHealth = {
+            uptime: `${Math.floor(dashboard.serverStats.uptime / 3600)}h ${Math.floor((dashboard.serverStats.uptime % 3600) / 60)}m`,
+            uptimeSeconds: dashboard.serverStats.uptime,
+            cpuUsage: Number(dashboard.serverStats.cpuUsage.toFixed(2)),
+            memoryUsage: Number(dashboard.serverStats.memoryUsage.toFixed(2)),
+            memoryTotal: `${dashboard.serverStats.totalMemoryGB.toFixed(2)} GB`,
+            memoryUsed: `${(dashboard.serverStats.totalMemoryGB * dashboard.serverStats.memoryUsage / 100).toFixed(2)} GB`,
+            diskUsage: Number(dashboard.serverStats.diskUsage.toFixed(2)),
+            diskTotal: `${dashboard.serverStats.totalDiskGB.toFixed(2)} GB`,
+            diskUsed: `${(dashboard.serverStats.totalDiskGB * dashboard.serverStats.diskUsage / 100).toFixed(2)} GB`,
+        };
+
+        const databaseStatus: DatabaseStatus = {
+            status: dashboard.databaseStats.connected ? "Connected" : "Disconnected",
+            responseTime: dashboard.databaseStats.responseTimeMs,
+            connections: dashboard.databaseStats.activeConnections,
+            maxConnections: dashboard.databaseStats.connectionPoolSize,
+            lastBackup: new Date().toISOString(),
+            size: `${dashboard.databaseStats.databaseSizeGB.toFixed(3)} GB`,
+        };
+
+        const deviceStats: DeviceStats = {
+            total: dashboard.devicesStats.totalDevices,
+            active: dashboard.devicesStats.activeDevices,
+            inactive: dashboard.devicesStats.inactiveDevices,
+            lowBattery: 0,
+        };
+
+        const apiStats: ApiStats = {
+            requestsPerMinute: Number(dashboard.apiUsageStats.requestsPerMinute.toFixed(2)),
+            avgResponseTime: Number(dashboard.apiUsageStats.averageResponseTimeMs.toFixed(2)),
+            errorRate: Number((100 - dashboard.apiUsageStats.successRatePercentage).toFixed(2)),
+            successRate: Number(dashboard.apiUsageStats.successRatePercentage.toFixed(2)),
+        };
+
+        const services: ServiceStatus[] = [
+            {
+                name: "API Gateway",
+                status: "Running",
+                uptime: systemHealth.uptime,
+                lastCheck: new Date().toISOString(),
+            },
+            {
+                name: "Database",
+                status: databaseStatus.status === "Connected" ? "Running" : "Stopped",
+                uptime: systemHealth.uptime,
+                lastCheck: new Date().toISOString(),
+            },
+        ];
+
         return {
-            totalUsers: 1247,
-            activeUsersToday: 892,
-            alertsLast24h: 23,
-            devicesOnline: 1156,
+            stats,
+            systemHealth,
+            databaseStatus,
+            deviceStats,
+            apiStats,
+            services,
+        };
+    },
+
+    // Legacy methods for backward compatibility (deprecated)
+    getDashboardStats: async (): Promise<DashboardStats> => {
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        return {
+            totalUsers: dashboard.usersStats.totalUsers,
+            activeUsersToday: dashboard.usersStats.activeUsers,
+            alertsLast24h: 0,
+            devicesOnline: dashboard.devicesStats.activeDevices,
         };
     },
 
     getSystemHealth: async (): Promise<SystemHealth> => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
         return {
-            uptime: "15d 7h 23m",
-            uptimeSeconds: 1324980,
-            cpuUsage: 34,
-            memoryUsage: 62,
-            memoryTotal: "16 GB",
-            memoryUsed: "9.92 GB",
-            diskUsage: 45,
-            diskTotal: "500 GB",
-            diskUsed: "225 GB",
+            uptime: `${Math.floor(dashboard.serverStats.uptime / 3600)}h ${Math.floor((dashboard.serverStats.uptime % 3600) / 60)}m`,
+            uptimeSeconds: dashboard.serverStats.uptime,
+            cpuUsage: Number(dashboard.serverStats.cpuUsage.toFixed(2)),
+            memoryUsage: Number(dashboard.serverStats.memoryUsage.toFixed(2)),
+            memoryTotal: `${dashboard.serverStats.totalMemoryGB.toFixed(2)} GB`,
+            memoryUsed: `${(dashboard.serverStats.totalMemoryGB * dashboard.serverStats.memoryUsage / 100).toFixed(2)} GB`,
+            diskUsage: Number(dashboard.serverStats.diskUsage.toFixed(2)),
+            diskTotal: `${dashboard.serverStats.totalDiskGB.toFixed(2)} GB`,
+            diskUsed: `${(dashboard.serverStats.totalDiskGB * dashboard.serverStats.diskUsage / 100).toFixed(2)} GB`,
         };
     },
 
     getDatabaseStatus: async (): Promise<DatabaseStatus> => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
         return {
-            status: "Connected",
-            responseTime: 12,
-            connections: 45,
-            maxConnections: 100,
-            lastBackup: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-            size: "2.4 GB",
+            status: dashboard.databaseStats.connected ? "Connected" : "Disconnected",
+            responseTime: dashboard.databaseStats.responseTimeMs,
+            connections: dashboard.databaseStats.activeConnections,
+            maxConnections: dashboard.databaseStats.connectionPoolSize,
+            lastBackup: new Date().toISOString(),
+            size: `${dashboard.databaseStats.databaseSizeGB.toFixed(3)} GB`,
         };
     },
 
     getDeviceStats: async (): Promise<DeviceStats> => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
         return {
-            total: 1350,
-            active: 1156,
-            inactive: 194,
-            lowBattery: 47,
+            total: dashboard.devicesStats.totalDevices,
+            active: dashboard.devicesStats.activeDevices,
+            inactive: dashboard.devicesStats.inactiveDevices,
+            lowBattery: 0,
         };
     },
 
     getApiStats: async (): Promise<ApiStats> => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
         return {
-            requestsPerMinute: 1250,
-            avgResponseTime: 45,
-            errorRate: 0.12,
-            successRate: 99.88,
+            requestsPerMinute: Number(dashboard.apiUsageStats.requestsPerMinute.toFixed(2)),
+            avgResponseTime: Number(dashboard.apiUsageStats.averageResponseTimeMs.toFixed(2)),
+            errorRate: Number((100 - dashboard.apiUsageStats.successRatePercentage).toFixed(2)),
+            successRate: Number(dashboard.apiUsageStats.successRatePercentage.toFixed(2)),
         };
     },
 
     getServiceStatuses: async (): Promise<ServiceStatus[]> => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const uptime = `${Math.floor(dashboard.serverStats.uptime / 3600)}h ${Math.floor((dashboard.serverStats.uptime % 3600) / 60)}m`;
         return [
             {
                 name: "API Gateway",
                 status: "Running",
-                uptime: "15d 7h 23m",
+                uptime,
                 lastCheck: new Date().toISOString(),
             },
             {
-                name: "Auth Service",
-                status: "Running",
-                uptime: "15d 7h 20m",
-                lastCheck: new Date().toISOString(),
-            },
-            {
-                name: "Data Processing",
-                status: "Running",
-                uptime: "14d 22h 15m",
-                lastCheck: new Date().toISOString(),
-            },
-            {
-                name: "ML Inference",
-                status: "Running",
-                uptime: "10d 5h 30m",
-                lastCheck: new Date().toISOString(),
-            },
-            {
-                name: "Notification Service",
-                status: "Warning",
-                uptime: "2d 3h 45m",
-                lastCheck: new Date().toISOString(),
-            },
-            {
-                name: "Backup Service",
-                status: "Running",
-                uptime: "15d 7h 23m",
+                name: "Database",
+                status: dashboard.databaseStats.connected ? "Running" : "Stopped",
+                uptime,
                 lastCheck: new Date().toISOString(),
             },
         ];

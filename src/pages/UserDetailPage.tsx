@@ -5,11 +5,11 @@ import {
     ArrowLeft,
     User,
     Cpu,
-    Battery,
-    Clock,
     Heart,
     Activity,
     Footprints,
+    Mail,
+    Scale,
 } from "lucide-react";
 import {
     LineChart,
@@ -33,7 +33,7 @@ import {
     TabsList,
     TabsTrigger,
 } from "@/components/ui";
-import { userService, deviceService } from "@/services";
+import { userService } from "@/services";
 import { formatDateTime } from "@/lib/utils";
 import type { User as UserType, Device, HealthMetric } from "@/types";
 
@@ -43,7 +43,7 @@ export function UserDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [user, setUser] = useState<UserType | null>(null);
-    const [device, setDevice] = useState<Device | null>(null);
+    const [devices, setDevices] = useState<Device[]>([]);
     const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
     const [timeRange, setTimeRange] = useState<TimeRange>("today");
     const [loading, setLoading] = useState(true);
@@ -53,12 +53,13 @@ export function UserDetailPage() {
             if (!id) return;
 
             try {
-                const [userData, deviceData] = await Promise.all([
-                    userService.getUserById(id),
-                    deviceService.getDeviceByUserId(id),
+                const userId = parseInt(id, 10);
+                const [userData, userDevices] = await Promise.all([
+                    userService.getUserById(userId),
+                    userService.getUserDevices(userId),
                 ]);
                 setUser(userData || null);
-                setDevice(deviceData || null);
+                setDevices(userDevices || []);
             } catch (error) {
                 console.error("Error fetching user data:", error);
             } finally {
@@ -71,18 +72,42 @@ export function UserDetailPage() {
 
     useEffect(() => {
         const fetchHealthMetrics = async () => {
-            if (!id) return;
+            if (!id || devices.length === 0) return;
 
             try {
-                const metrics = await userService.getUserHealthMetrics(id, timeRange);
-                setHealthMetrics(metrics);
+                const userId = parseInt(id, 10);
+                const activeDevice = devices.find(d => d.isActive) || devices[0];
+                if (!activeDevice) return;
+
+                const now = new Date();
+                let startDate: Date;
+                switch (timeRange) {
+                    case "1h":
+                        startDate = new Date(now.getTime() - 60 * 60 * 1000);
+                        break;
+                    case "today":
+                        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        break;
+                    case "7d":
+                        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        break;
+                }
+
+                const response = await userService.getUserHealthData(
+                    userId,
+                    activeDevice.deviceUuid,
+                    startDate.toISOString(),
+                    now.toISOString()
+                );
+                setHealthMetrics(response.dataPoints || []);
             } catch (error) {
                 console.error("Error fetching health metrics:", error);
+                setHealthMetrics([]);
             }
         };
 
         fetchHealthMetrics();
-    }, [id, timeRange]);
+    }, [id, timeRange, devices]);
 
     if (loading) {
         return (
@@ -101,11 +126,7 @@ export function UserDetailPage() {
         );
     }
 
-    const getBatteryColor = (level: number) => {
-        if (level <= 20) return "text-destructive";
-        if (level <= 50) return "text-muted-foreground";
-        return "text-foreground";
-    };
+    const activeDevice = devices.find(d => d.isActive) || devices[0];
 
     return (
         <motion.div
@@ -114,7 +135,6 @@ export function UserDetailPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
         >
-            {/* Header */}
             <div className="flex items-center gap-4">
                 <Button
                     variant="ghost"
@@ -125,12 +145,14 @@ export function UserDetailPage() {
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold">{user.name}</h1>
-                    <p className="text-muted-foreground">User ID: {user.id}</p>
+                    <h1 className="text-2xl font-bold">{user.fullName}</h1>
+                    <p className="text-muted-foreground">@{user.username} • ID: {user.id}</p>
                 </div>
+                <Badge variant={user.enabled ? "default" : "secondary"} className="ml-auto">
+                    {user.enabled ? "Enabled" : "Disabled"}
+                </Badge>
             </div>
 
-            {/* Info Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardContent className="p-6">
@@ -141,10 +163,43 @@ export function UserDetailPage() {
                             <div>
                                 <p className="text-sm text-muted-foreground">Profile</p>
                                 <p className="font-medium">
-                                    {user.age}y • {user.gender}
+                                    {user.gender || "Not specified"}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                    {user.height}cm • {user.weight}kg
+                                    DOB: {user.dob || "N/A"}
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                                <Mail className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Email</p>
+                                <p className="font-medium text-sm break-all">{user.email}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                                <Scale className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Body Metrics</p>
+                                <p className="font-medium">
+                                    {user.heightM ? `${user.heightM}m` : "N/A"} • {user.weightKg ? `${user.weightKg}kg` : "N/A"}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    BMI: {user.bmi?.toFixed(1) || "N/A"}
                                 </p>
                             </div>
                         </div>
@@ -159,53 +214,17 @@ export function UserDetailPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Device</p>
-                                <p className="font-mono font-medium">{device?.id || "N/A"}</p>
-                                <Badge
-                                    variant={
-                                        device?.connectionStatus === "Connected"
-                                            ? "default"
-                                            : "secondary"
-                                    }
-                                    className="mt-1"
-                                >
-                                    {device?.connectionStatus || "Unknown"}
-                                </Badge>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-                                <Battery className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Battery</p>
-                                <p
-                                    className={`text-2xl font-bold ${getBatteryColor(
-                                        device?.batteryLevel || 0
-                                    )}`}
-                                >
-                                    {device?.batteryLevel || 0}%
+                                <p className="font-mono font-medium text-sm">
+                                    {activeDevice?.deviceName || "No device"}
                                 </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-                                <Clock className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Last Active</p>
-                                <p className="text-sm font-medium">
-                                    {formatDateTime(user.lastActiveTime)}
-                                </p>
+                                {activeDevice && (
+                                    <Badge
+                                        variant={activeDevice.isActive ? "default" : "secondary"}
+                                        className="mt-1"
+                                    >
+                                        {activeDevice.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -338,7 +357,7 @@ export function UserDetailPage() {
                                         />
                                         <Line
                                             type="monotone"
-                                            dataKey="spO2"
+                                            dataKey="spo2"
                                             stroke="#737373"
                                             strokeWidth={2}
                                             dot={false}
@@ -394,7 +413,7 @@ export function UserDetailPage() {
                                         labelFormatter={(value) => formatDateTime(value as string)}
                                     />
                                     <Bar
-                                        dataKey="steps"
+                                        dataKey="stepCount"
                                         fill="#404040"
                                         radius={[4, 4, 0, 0]}
                                         name="Steps"

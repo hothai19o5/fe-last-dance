@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { authService } from "@/services";
 
 interface AuthContextType {
     isAuthenticated: boolean;
-    user: { email: string; name: string } | null;
-    login: (email: string, password: string) => Promise<boolean>;
+    user: { username: string } | null;
+    login: (username: string, password: string) => Promise<boolean>;
     logout: () => void;
 }
 
@@ -11,33 +12,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        return localStorage.getItem("isAuthenticated") === "true";
+        return !!localStorage.getItem("token");
     });
-    const [user, setUser] = useState<{ email: string; name: string } | null>(() => {
+    const [user, setUser] = useState<{ username: string } | null>(() => {
         const stored = localStorage.getItem("user");
         return stored ? JSON.parse(stored) : null;
     });
 
-    const login = async (email: string, _password: string): Promise<boolean> => {
-        // Mock authentication
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        if (email && _password) {
-            const userData = { email, name: "Admin User" };
-            setIsAuthenticated(true);
-            setUser(userData);
-            localStorage.setItem("isAuthenticated", "true");
-            localStorage.setItem("user", JSON.stringify(userData));
-            return true;
+    const login = async (username: string, password: string): Promise<boolean> => {
+        try {
+            const response = await authService.login({ username, password });
+            if (response.token) {
+                authService.setToken(response.token);
+                const userData = { username };
+                setIsAuthenticated(true);
+                setUser(userData);
+                localStorage.setItem("user", JSON.stringify(userData));
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
         }
-        return false;
     };
 
     const logout = () => {
         setIsAuthenticated(false);
         setUser(null);
-        localStorage.removeItem("isAuthenticated");
-        localStorage.removeItem("user");
+        authService.logout();
     };
 
     return (
