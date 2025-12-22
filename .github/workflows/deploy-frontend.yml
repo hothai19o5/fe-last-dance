@@ -33,7 +33,7 @@ jobs:
           host: ${{ secrets.DROPLET_IP }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "build/*" # Chỉ lấy nội dung trong thư mục build
+          source: "dist/*" # Chỉ lấy nội dung trong thư mục build
           target: "/var/www/html/"
           strip_components: 1 # Loại bỏ thư mục 'build' để file nằm ngay root
 
