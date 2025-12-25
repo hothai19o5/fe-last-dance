@@ -3,12 +3,14 @@ import type { DashboardResponse, DashboardStats, SystemHealth, DatabaseStatus, D
 
 export const healthService = {
     getDashboard: async (): Promise<DashboardResponse> => {
-        return apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        return response.data;
     },
 
     // Fetch all dashboard data in one API call
     getAllDashboardData: async () => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
 
         const stats: DashboardStats = {
             totalUsers: dashboard.usersStats.totalUsers,
@@ -79,7 +81,8 @@ export const healthService = {
 
     // Legacy methods for backward compatibility (deprecated)
     getDashboardStats: async (): Promise<DashboardStats> => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
         return {
             totalUsers: dashboard.usersStats.totalUsers,
             activeUsersToday: dashboard.usersStats.activeUsers,
@@ -89,7 +92,8 @@ export const healthService = {
     },
 
     getSystemHealth: async (): Promise<SystemHealth> => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
         return {
             uptime: `${Math.floor(dashboard.serverStats.uptime / 3600)}h ${Math.floor((dashboard.serverStats.uptime % 3600) / 60)}m`,
             uptimeSeconds: dashboard.serverStats.uptime,
@@ -104,7 +108,8 @@ export const healthService = {
     },
 
     getDatabaseStatus: async (): Promise<DatabaseStatus> => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
         return {
             status: dashboard.databaseStats.connected ? "Connected" : "Disconnected",
             responseTime: dashboard.databaseStats.responseTimeMs,
@@ -116,7 +121,8 @@ export const healthService = {
     },
 
     getDeviceStats: async (): Promise<DeviceStats> => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
         return {
             total: dashboard.devicesStats.totalDevices,
             active: dashboard.devicesStats.activeDevices,
@@ -126,7 +132,8 @@ export const healthService = {
     },
 
     getApiStats: async (): Promise<ApiStats> => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
         return {
             requestsPerMinute: Number(dashboard.apiUsageStats.requestsPerMinute.toFixed(2)),
             avgResponseTime: Number(dashboard.apiUsageStats.averageResponseTimeMs.toFixed(2)),
@@ -136,7 +143,8 @@ export const healthService = {
     },
 
     getServiceStatuses: async (): Promise<ServiceStatus[]> => {
-        const dashboard = await apiClient.get<DashboardResponse>('/dashboard');
+        const response = await apiClient.get<{ data: DashboardResponse }>('/dashboard');
+        const dashboard = response.data;
         const uptime = `${Math.floor(dashboard.serverStats.uptime / 3600)}h ${Math.floor((dashboard.serverStats.uptime % 3600) / 60)}m`;
         return [
             {
