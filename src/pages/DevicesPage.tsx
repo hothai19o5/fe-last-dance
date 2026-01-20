@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Cpu, Wifi, WifiOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { Cpu, Wifi, WifiOff, ChevronLeft, ChevronRight, MoreHorizontal, Power, PowerOff, Trash2 } from "lucide-react";
 import {
     Card,
     CardContent,
@@ -19,6 +19,16 @@ import {
     TableHeader,
     TableRow,
     Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
 } from "@/components/ui";
 import { deviceService } from "@/services";
 import type { Device } from "@/types";
@@ -30,22 +40,26 @@ export function DevicesPage() {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
+    const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogAction, setDialogAction] = useState<"enable" | "disable" | "delete" | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
+
+    const fetchDevices = async () => {
+        try {
+            setLoading(true);
+            const response = await deviceService.getDevices({ page, size: 10 });
+            setDevices(response.content);
+            setFilteredDevices(response.content);
+            setTotalPages(response.totalPages);
+        } catch (error) {
+            console.error("Error fetching devices:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchDevices = async () => {
-            try {
-                setLoading(true);
-                const response = await deviceService.getDevices({ page, size: 10 });
-                setDevices(response.content);
-                setFilteredDevices(response.content);
-                setTotalPages(response.totalPages);
-            } catch (error) {
-                console.error("Error fetching devices:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchDevices();
     }, [page]);
 
@@ -59,6 +73,57 @@ export function DevicesPage() {
             );
         }
     }, [statusFilter, devices]);
+
+    const handleAction = (device: Device, action: "enable" | "disable" | "delete") => {
+        setSelectedDevice(device);
+        setDialogAction(action);
+        setDialogOpen(true);
+    };
+
+    const confirmAction = async () => {
+        if (!selectedDevice || !dialogAction) return;
+
+        setActionLoading(true);
+        try {
+            if (dialogAction === "enable") {
+                await deviceService.enableDevice(selectedDevice.id);
+            } else if (dialogAction === "disable") {
+                await deviceService.disableDevice(selectedDevice.id);
+            } else if (dialogAction === "delete") {
+                await deviceService.deleteDevice(selectedDevice.id);
+            }
+            await fetchDevices();
+        } catch (error) {
+            console.error(`Error ${dialogAction}ing device:`, error);
+        } finally {
+            setActionLoading(false);
+            setDialogOpen(false);
+            setSelectedDevice(null);
+            setDialogAction(null);
+        }
+    };
+
+    const getDialogContent = () => {
+        if (!selectedDevice || !dialogAction) return { title: "", description: "" };
+
+        switch (dialogAction) {
+            case "enable":
+                return {
+                    title: "Enable Device",
+                    description: `Are you sure you want to enable device "${selectedDevice.deviceName}"?`,
+                };
+            case "disable":
+                return {
+                    title: "Disable Device",
+                    description: `Are you sure you want to disable device "${selectedDevice.deviceName}"?`,
+                };
+            case "delete":
+                return {
+                    title: "Delete Device",
+                    description: `Are you sure you want to delete device "${selectedDevice.deviceName}"? This action cannot be undone.`,
+                };
+        }
+    };
 
     const stats = {
         total: devices.length,
@@ -158,6 +223,7 @@ export function DevicesPage() {
                                     <TableHead>Device Name</TableHead>
                                     <TableHead>Assigned User</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -187,6 +253,35 @@ export function DevicesPage() {
                                                 )}
                                                 {device.isActive ? "Active" : "Inactive"}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    {device.isActive ? (
+                                                        <DropdownMenuItem onClick={() => handleAction(device, "disable")}>
+                                                            <PowerOff className="mr-2 h-4 w-4" />
+                                                            Disable
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem onClick={() => handleAction(device, "enable")}>
+                                                            <Power className="mr-2 h-4 w-4" />
+                                                            Enable
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleAction(device, "delete")}
+                                                        className="text-destructive"
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -225,6 +320,27 @@ export function DevicesPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{getDialogContent().title}</DialogTitle>
+                        <DialogDescription>{getDialogContent().description}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={actionLoading}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant={dialogAction === "delete" ? "destructive" : "default"}
+                            onClick={confirmAction}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? "Processing..." : "Confirm"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </motion.div>
     );
 }

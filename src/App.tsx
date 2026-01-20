@@ -6,7 +6,6 @@ import {
   DashboardPage,
   UsersPage,
   UserDetailPage,
-  AlertsPage,
   DevicesPage,
   SettingsPage,
 } from "@/pages";
@@ -22,7 +21,6 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/users/:id" element={<UserDetailPage />} />
-              <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/devices" element={<DevicesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

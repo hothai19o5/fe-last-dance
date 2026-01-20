@@ -10,18 +10,11 @@ import {
     Footprints,
     Mail,
     Scale,
+    Droplet,
+    Moon,
+    Flame,
+    AlertTriangle,
 } from "lucide-react";
-import {
-    LineChart,
-    Line,
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-} from "recharts";
 import {
     Card,
     CardContent,
@@ -29,23 +22,17 @@ import {
     CardTitle,
     Button,
     Badge,
-    Tabs,
-    TabsList,
-    TabsTrigger,
 } from "@/components/ui";
 import { userService } from "@/services";
-import { formatDateTime } from "@/lib/utils";
-import type { User as UserType, Device, HealthMetric } from "@/types";
-
-type TimeRange = "1h" | "today" | "7d";
+import type { User as UserType, Device } from "@/types";
+import type { UserOverview } from "@/services/userService";
 
 export function UserDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [user, setUser] = useState<UserType | null>(null);
     const [devices, setDevices] = useState<Device[]>([]);
-    const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
-    const [timeRange, setTimeRange] = useState<TimeRange>("today");
+    const [overview, setOverview] = useState<UserOverview | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -54,12 +41,14 @@ export function UserDetailPage() {
 
             try {
                 const userId = parseInt(id, 10);
-                const [userData, userDevices] = await Promise.all([
+                const [userData, userDevices, userOverview] = await Promise.all([
                     userService.getUserById(userId),
                     userService.getUserDevices(userId),
+                    userService.getUserOverview(userId),
                 ]);
                 setUser(userData || null);
                 setDevices(userDevices || []);
+                setOverview(userOverview || null);
             } catch (error) {
                 console.error("Error fetching user data:", error);
             } finally {
@@ -69,45 +58,6 @@ export function UserDetailPage() {
 
         fetchData();
     }, [id]);
-
-    useEffect(() => {
-        const fetchHealthMetrics = async () => {
-            if (!id || devices.length === 0) return;
-
-            try {
-                const userId = parseInt(id, 10);
-                const activeDevice = devices.find(d => d.isActive) || devices[0];
-                if (!activeDevice) return;
-
-                const now = new Date();
-                let startDate: Date;
-                switch (timeRange) {
-                    case "1h":
-                        startDate = new Date(now.getTime() - 60 * 60 * 1000);
-                        break;
-                    case "today":
-                        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                        break;
-                    case "7d":
-                        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                        break;
-                }
-
-                const response = await userService.getUserHealthData(
-                    userId,
-                    activeDevice.deviceUuid,
-                    startDate.toISOString(),
-                    now.toISOString()
-                );
-                setHealthMetrics(response.dataPoints || []);
-            } catch (error) {
-                console.error("Error fetching health metrics:", error);
-                setHealthMetrics([]);
-            }
-        };
-
-        fetchHealthMetrics();
-    }, [id, timeRange, devices]);
 
     if (loading) {
         return (
@@ -231,196 +181,172 @@ export function UserDetailPage() {
                 </Card>
             </div>
 
-            {/* Health Charts */}
+            {/* Health Summary - Privacy Compliant (Aggregated Data Only) */}
             <Card>
                 <CardHeader>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <CardTitle>Health Metrics</CardTitle>
-                        <Tabs
-                            value={timeRange}
-                            onValueChange={(v) => setTimeRange(v as TimeRange)}
-                        >
-                            <TabsList>
-                                <TabsTrigger value="1h">1 Hour</TabsTrigger>
-                                <TabsTrigger value="today">Today</TabsTrigger>
-                                <TabsTrigger value="7d">7 Days</TabsTrigger>
-                            </TabsList>
-                        </Tabs>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Health Summary (Last 7 Days)</CardTitle>
+                        <Badge variant="outline" className="gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Privacy Mode: Aggregated Data Only
+                        </Badge>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        {/* Heart Rate Chart */}
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <Heart className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm font-medium">Heart Rate (BPM)</span>
-                            </div>
-                            <div className="h-[250px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={healthMetrics}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                        <XAxis
-                                            dataKey="timestamp"
-                                            tick={{ fontSize: 10 }}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            tickFormatter={(value) => {
-                                                const date = new Date(value);
-                                                return timeRange === "1h"
-                                                    ? date.toLocaleTimeString([], {
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                    })
-                                                    : date.toLocaleDateString([], {
-                                                        month: "short",
-                                                        day: "numeric",
-                                                    });
-                                            }}
-                                            className="fill-muted-foreground"
-                                        />
-                                        <YAxis
-                                            domain={[40, 120]}
-                                            tick={{ fontSize: 10 }}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            className="fill-muted-foreground"
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: "var(--card)",
-                                                border: "1px solid var(--border)",
-                                                borderRadius: "12px",
-                                            }}
-                                            labelFormatter={(value) =>
-                                                formatDateTime(value as string)
-                                            }
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="heartRate"
-                                            stroke="#525252"
-                                            strokeWidth={2}
-                                            dot={false}
-                                            name="Heart Rate"
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {/* Heart Rate Summary */}
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
+                                        <Heart className="h-5 w-5 text-red-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Avg Heart Rate</p>
+                                        <p className="text-xl font-bold">
+                                            {overview?.healthSummary.avgHeartRate.toFixed(0) || "—"} <span className="text-sm font-normal text-muted-foreground">bpm</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                        {/* SpO2 Chart */}
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <Activity className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm font-medium">SpO2 (%)</span>
-                            </div>
-                            <div className="h-[250px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={healthMetrics}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                        <XAxis
-                                            dataKey="timestamp"
-                                            tick={{ fontSize: 10 }}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            tickFormatter={(value) => {
-                                                const date = new Date(value);
-                                                return timeRange === "1h"
-                                                    ? date.toLocaleTimeString([], {
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                    })
-                                                    : date.toLocaleDateString([], {
-                                                        month: "short",
-                                                        day: "numeric",
-                                                    });
-                                            }}
-                                            className="fill-muted-foreground"
-                                        />
-                                        <YAxis
-                                            domain={[85, 100]}
-                                            tick={{ fontSize: 10 }}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            className="fill-muted-foreground"
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: "var(--card)",
-                                                border: "1px solid var(--border)",
-                                                borderRadius: "12px",
-                                            }}
-                                            labelFormatter={(value) =>
-                                                formatDateTime(value as string)
-                                            }
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="spo2"
-                                            stroke="#737373"
-                                            strokeWidth={2}
-                                            dot={false}
-                                            name="SpO2"
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
+                        {/* SpO2 Summary */}
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
+                                        <Activity className="h-5 w-5 text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Avg SpO2</p>
+                                        <p className="text-xl font-bold">
+                                            {overview?.healthSummary.avgSpO2.toFixed(1) || "—"} <span className="text-sm font-normal text-muted-foreground">%</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Steps Summary */}
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
+                                        <Footprints className="h-5 w-5 text-green-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Avg Steps</p>
+                                        <p className="text-xl font-bold">
+                                            {overview?.healthSummary.avgSteps.toFixed(0) || "—"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Calories Summary */}
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
+                                        <Flame className="h-5 w-5 text-orange-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Avg Calories</p>
+                                        <p className="text-xl font-bold">
+                                            {overview?.healthSummary.avgCalories.toFixed(0) || "—"} <span className="text-sm font-normal text-muted-foreground">kcal</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Water Intake Summary */}
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10">
+                                        <Droplet className="h-5 w-5 text-cyan-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Avg Water Intake</p>
+                                        <p className="text-xl font-bold">
+                                            {overview?.healthSummary.avgWaterIntakeMl.toFixed(0) || "—"} <span className="text-sm font-normal text-muted-foreground">ml</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Sleep Summary */}
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10">
+                                        <Moon className="h-5 w-5 text-purple-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Avg Sleep</p>
+                                        <p className="text-xl font-bold">
+                                            {overview?.healthSummary.avgSleepMinutes ? `${(overview.healthSummary.avgSleepMinutes / 60).toFixed(1)}h` : "—"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    {/* Steps Chart */}
-                    <div className="mt-6 space-y-2">
-                        <div className="flex items-center gap-2">
-                            <Footprints className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Steps</span>
-                        </div>
-                        <div className="h-[250px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={healthMetrics}>
-                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                    <XAxis
-                                        dataKey="timestamp"
-                                        tick={{ fontSize: 10 }}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        tickFormatter={(value) => {
-                                            const date = new Date(value);
-                                            return timeRange === "1h"
-                                                ? date.toLocaleTimeString([], {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                })
-                                                : date.toLocaleDateString([], {
-                                                    month: "short",
-                                                    day: "numeric",
-                                                });
-                                        }}
-                                        className="fill-muted-foreground"
-                                    />
-                                    <YAxis
-                                        tick={{ fontSize: 10 }}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        className="fill-muted-foreground"
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "var(--card)",
-                                            border: "1px solid var(--border)",
-                                            borderRadius: "12px",
-                                        }}
-                                        labelFormatter={(value) => formatDateTime(value as string)}
-                                    />
-                                    <Bar
-                                        dataKey="stepCount"
-                                        fill="#404040"
-                                        radius={[4, 4, 0, 0]}
-                                        name="Steps"
-                                    />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                    {/* Alert Statistics */}
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <Card className="border-yellow-500/20 bg-yellow-500/5">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Total Alerts (7d)</p>
+                                        <p className="text-2xl font-bold">{overview?.healthSummary.totalAlerts || 0}</p>
+                                    </div>
+                                    <AlertTriangle className="h-8 w-8 text-yellow-500" />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-red-500/20 bg-red-500/5">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">High Severity Alerts</p>
+                                        <p className="text-2xl font-bold">{overview?.healthSummary.highSeverityAlerts || 0}</p>
+                                    </div>
+                                    <AlertTriangle className="h-8 w-8 text-red-500" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Sync Status */}
+                    <div className="mt-4">
+                        <Card className="border-muted">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Last Sync</p>
+                                        <p className="font-medium">{overview?.healthSummary.lastSyncTime || "Never"}</p>
+                                    </div>
+                                    <Badge variant={overview?.healthSummary.activeDevices ? "default" : "secondary"}>
+                                        {overview?.healthSummary.activeDevices || 0} Active / {overview?.healthSummary.totalDevices || 0} Total Devices
+                                    </Badge>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Privacy Notice */}
+                    <div className="mt-4 rounded-lg border border-muted bg-muted/30 p-4">
+                        <p className="text-xs text-muted-foreground">
+                            <strong>Privacy Notice:</strong> This view displays only aggregated health statistics for the last 7 days.
+                            Individual health data points are not accessible to maintain user privacy in compliance with data protection regulations.
+                        </p>
                     </div>
                 </CardContent>
             </Card>

@@ -2,7 +2,6 @@ import { NavLink } from "react-router-dom";
 import {
     LayoutDashboard,
     Users,
-    AlertTriangle,
     Cpu,
     Settings,
     Activity,
@@ -19,7 +18,6 @@ interface SidebarProps {
 const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Users", href: "/users", icon: Users },
-    { name: "Alerts", href: "/alerts", icon: AlertTriangle },
     { name: "Devices", href: "/devices", icon: Cpu },
     { name: "Settings", href: "/settings", icon: Settings },
 ];

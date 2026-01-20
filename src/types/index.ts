@@ -1,7 +1,6 @@
 export interface User {
     id: number;
     username: string;
-    email: string;
     fullName: string;
     profilePictureUrl?: string;
     dob?: string;
@@ -32,18 +31,6 @@ export interface HealthMetric {
 export interface HealthDataResponse {
     deviceUuid: string;
     dataPoints: HealthMetric[];
-}
-
-export interface Alert {
-    id: string;
-    userId: string;
-    userName: string;
-    timestamp: string;
-    heartRate: number;
-    spO2: number;
-    mlScore: number;
-    severity: "Low" | "Medium" | "High";
-    status: "New" | "Viewed" | "Resolved";
 }
 
 export interface Device {

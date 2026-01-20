@@ -7,6 +7,25 @@ export interface GetUsersParams {
     sortBy?: string;
 }
 
+export interface UserOverview {
+    userId: number;
+    username: string;
+    email: string;
+    healthSummary: {
+        avgHeartRate: number;
+        avgSpO2: number;
+        avgSteps: number;
+        avgCalories: number;
+        avgWaterIntakeMl: number;
+        avgSleepMinutes: number;
+        totalDevices: number;
+        activeDevices: number;
+        totalAlerts: number;
+        highSeverityAlerts: number;
+        lastSyncTime: string;
+    };
+}
+
 export const userService = {
     getUsers: async (params: GetUsersParams = {}): Promise<PaginatedResponse<User>> => {
         const { page = 0, size = 10, sortBy = 'id' } = params;
@@ -47,5 +66,21 @@ export const userService = {
             `/user/${userId}/${deviceUuid}/health-data`,
             params
         );
+    },
+
+    getUserOverview: async (userId: number): Promise<UserOverview> => {
+        return apiClient.get<UserOverview>(`/admin/users/${userId}/overview`);
+    },
+
+    enableUser: async (userId: number): Promise<void> => {
+        return apiClient.patch<void>(`/user/${userId}/enable`);
+    },
+
+    disableUser: async (userId: number): Promise<void> => {
+        return apiClient.patch<void>(`/user/${userId}/disable`);
+    },
+
+    deleteUser: async (userId: number): Promise<void> => {
+        return apiClient.delete<void>(`/user/${userId}`);
     },
 };

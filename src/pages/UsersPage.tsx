@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, MoreHorizontal, UserCheck, UserX, Trash2 } from "lucide-react";
 import {
     Card,
     CardContent,
@@ -21,6 +21,16 @@ import {
     TableHeader,
     TableRow,
     Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
 } from "@/components/ui";
 import { userService } from "@/services";
 import type { User } from "@/types";
@@ -33,23 +43,27 @@ export function UsersPage() {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogAction, setDialogAction] = useState<"enable" | "disable" | "delete" | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                setLoading(true);
-                const response = await userService.getUsers({ page, size: 10 });
-                setUsers(response.content);
-                setFilteredUsers(response.content);
-                setTotalPages(response.totalPages);
-            } catch (error) {
-                console.error("Error fetching users:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchUsers = async () => {
+        try {
+            setLoading(true);
+            const response = await userService.getUsers({ page, size: 10 });
+            setUsers(response.content);
+            setFilteredUsers(response.content);
+            setTotalPages(response.totalPages);
+        } catch (error) {
+            console.error("Error fetching users:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchUsers();
     }, [page]);
 
@@ -70,6 +84,57 @@ export function UsersPage() {
 
         setFilteredUsers(result);
     }, [searchQuery, statusFilter, users]);
+
+    const handleAction = (user: User, action: "enable" | "disable" | "delete") => {
+        setSelectedUser(user);
+        setDialogAction(action);
+        setDialogOpen(true);
+    };
+
+    const confirmAction = async () => {
+        if (!selectedUser || !dialogAction) return;
+
+        setActionLoading(true);
+        try {
+            if (dialogAction === "enable") {
+                await userService.enableUser(selectedUser.id);
+            } else if (dialogAction === "disable") {
+                await userService.disableUser(selectedUser.id);
+            } else if (dialogAction === "delete") {
+                await userService.deleteUser(selectedUser.id);
+            }
+            await fetchUsers();
+        } catch (error) {
+            console.error(`Error ${dialogAction}ing user:`, error);
+        } finally {
+            setActionLoading(false);
+            setDialogOpen(false);
+            setSelectedUser(null);
+            setDialogAction(null);
+        }
+    };
+
+    const getDialogContent = () => {
+        if (!selectedUser || !dialogAction) return { title: "", description: "" };
+
+        switch (dialogAction) {
+            case "enable":
+                return {
+                    title: "Enable User",
+                    description: `Are you sure you want to enable user "${selectedUser.username}"? They will be able to access the system.`,
+                };
+            case "disable":
+                return {
+                    title: "Disable User",
+                    description: `Are you sure you want to disable user "${selectedUser.username}"? They will not be able to access the system.`,
+                };
+            case "delete":
+                return {
+                    title: "Delete User",
+                    description: `Are you sure you want to delete user "${selectedUser.username}"? This action cannot be undone.`,
+                };
+        }
+    };
 
     if (loading) {
         return (
@@ -128,12 +193,12 @@ export function UsersPage() {
                                     <TableHead>ID</TableHead>
                                     <TableHead>Username</TableHead>
                                     <TableHead>Full Name</TableHead>
-                                    <TableHead className="hidden md:table-cell">Email</TableHead>
                                     <TableHead className="hidden md:table-cell">Gender</TableHead>
                                     <TableHead className="hidden lg:table-cell">Height (m)</TableHead>
                                     <TableHead className="hidden lg:table-cell">Weight (kg)</TableHead>
                                     <TableHead className="hidden xl:table-cell">BMI</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -141,34 +206,81 @@ export function UsersPage() {
                                     <TableRow
                                         key={user.id}
                                         className="cursor-pointer transition-colors hover:bg-muted/50"
-                                        onClick={() => navigate(`/users/${user.id}`)}
                                     >
-                                        <TableCell className="font-mono text-sm">
+                                        <TableCell
+                                            className="font-mono text-sm"
+                                            onClick={() => navigate(`/users/${user.id}`)}
+                                        >
                                             {user.id}
                                         </TableCell>
-                                        <TableCell className="font-medium">{user.username}</TableCell>
-                                        <TableCell>{user.fullName}</TableCell>
-                                        <TableCell className="hidden md:table-cell">
-                                            {user.email}
+                                        <TableCell
+                                            className="font-medium"
+                                            onClick={() => navigate(`/users/${user.id}`)}
+                                        >
+                                            {user.username}
                                         </TableCell>
-                                        <TableCell className="hidden md:table-cell">
+                                        <TableCell onClick={() => navigate(`/users/${user.id}`)}>
+                                            {user.fullName}
+                                        </TableCell>
+                                        <TableCell
+                                            className="hidden md:table-cell"
+                                            onClick={() => navigate(`/users/${user.id}`)}
+                                        >
                                             {user.gender || "-"}
                                         </TableCell>
-                                        <TableCell className="hidden lg:table-cell">
+                                        <TableCell
+                                            className="hidden lg:table-cell"
+                                            onClick={() => navigate(`/users/${user.id}`)}
+                                        >
                                             {user.heightM ?? "-"}
                                         </TableCell>
-                                        <TableCell className="hidden lg:table-cell">
+                                        <TableCell
+                                            className="hidden lg:table-cell"
+                                            onClick={() => navigate(`/users/${user.id}`)}
+                                        >
                                             {user.weightKg ?? "-"}
                                         </TableCell>
-                                        <TableCell className="hidden xl:table-cell">
+                                        <TableCell
+                                            className="hidden xl:table-cell"
+                                            onClick={() => navigate(`/users/${user.id}`)}
+                                        >
                                             {user.bmi?.toFixed(1) ?? "-"}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell onClick={() => navigate(`/users/${user.id}`)}>
                                             <Badge
                                                 variant={user.enabled ? "default" : "secondary"}
                                             >
                                                 {user.enabled ? "Enabled" : "Disabled"}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    {user.enabled ? (
+                                                        <DropdownMenuItem onClick={() => handleAction(user, "disable")}>
+                                                            <UserX className="mr-2 h-4 w-4" />
+                                                            Disable
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem onClick={() => handleAction(user, "enable")}>
+                                                            <UserCheck className="mr-2 h-4 w-4" />
+                                                            Enable
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleAction(user, "delete")}
+                                                        className="text-destructive"
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -207,6 +319,27 @@ export function UsersPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{getDialogContent().title}</DialogTitle>
+                        <DialogDescription>{getDialogContent().description}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={actionLoading}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant={dialogAction === "delete" ? "destructive" : "default"}
+                            onClick={confirmAction}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? "Processing..." : "Confirm"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </motion.div>
     );
 }

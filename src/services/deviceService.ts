@@ -24,4 +24,16 @@ export const deviceService = {
     syncHealthData: async (data: SyncHealthDataRequest): Promise<void> => {
         return apiClient.post<void>('/sync/health-data', data);
     },
+
+    enableDevice: async (deviceId: number): Promise<void> => {
+        return apiClient.patch<void>(`/device/${deviceId}/enable`);
+    },
+
+    disableDevice: async (deviceId: number): Promise<void> => {
+        return apiClient.patch<void>(`/device/${deviceId}/disable`);
+    },
+
+    deleteDevice: async (deviceId: number): Promise<void> => {
+        return apiClient.delete<void>(`/device/${deviceId}`);
+    },
 };
